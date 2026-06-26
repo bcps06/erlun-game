@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>實景辨識挑戰 - 二崙軍史公園</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            touch-action: manipulation;
+            background-color: #f8fafc;
+        }
+        .draggable {
+            cursor: grab;
+            transition: all 0.2s;
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+        .draggable:active {
+            cursor: grabbing;
+            transform: scale(1.1) rotate(3deg);
+        }
+        .drop-zone {
+            transition: all 0.3s;
+        }
+        .drop-zone.drag-over {
+            transform: scale(1.02);
+            filter: brightness(1.05);
+            border-style: solid;
+        }
+        .dragging {
+            opacity: 0.6;
+        }
+        .img-container {
+            width: 100%;
+            height: 75%;
+            overflow: hidden;
+            border-radius: 12px;
+            background-color: #f1f5f9;
+        }
+        .img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        /* 限制裝備池寬度以達成 3, 4 排列效果 */
+        #item-pool {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            max-width: 700px; /* 控制容器寬度迫使換行 */
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-slate-800">🎖️ 二崙軍史公園：實景辨識挑戰 🎖️</h1>
+            <p class="text-slate-600 mt-2">小小偵查官，請觀察您的真實照片，將裝備拖回正確的基地！</p>
+            <div class="mt-4 inline-block bg-white px-6 py-2 rounded-full shadow-sm text-xl font-bold text-blue-600">
+                目前進度：<span id="score">0</span> / 7
+            </div>
+        </header>
+
+        <!-- 裝備池：設定為上排3個，下排4個 -->
+        <div id="item-pool" class="p-6 bg-white rounded-3xl shadow-md mb-8 min-h-[460px]">
+            <!-- 裝備項目由 JS 自動生成 -->
+        </div>
+
+        <!-- 基地目標區域 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- 空軍 -->
+            <div id="AIR_FORCE" class="drop-zone bg-blue-50 border-4 border-blue-300 border-dashed rounded-3xl p-4 min-h-[320px] flex flex-col items-center">
+                <div class="bg-blue-500 text-white px-6 py-1 rounded-full text-sm font-bold mb-4 shadow-sm">✈️ 空軍基地</div>
+                <div class="target-content flex flex-wrap gap-2 justify-center w-full"></div>
+            </div>
+
+            <!-- 陸軍 -->
+            <div id="ARMY" class="drop-zone bg-green-50 border-4 border-green-300 border-dashed rounded-3xl p-4 min-h-[320px] flex flex-col items-center">
+                <div class="bg-green-600 text-white px-6 py-1 rounded-full text-sm font-bold mb-4 shadow-sm">🚜 陸軍基地</div>
+                <div class="target-content flex flex-wrap gap-2 justify-center w-full"></div>
+            </div>
+
+            <!-- 海軍 -->
+            <div id="NAVY" class="drop-zone bg-cyan-50 border-4 border-cyan-300 border-dashed rounded-3xl p-4 min-h-[320px] flex flex-col items-center">
+                <div class="bg-cyan-600 text-white px-4 py-1 rounded-full text-sm font-bold mb-4 shadow-sm">⚓ 海軍基地</div>
+                <div class="target-content flex flex-wrap gap-2 justify-center w-full"></div>
+            </div>
+        </div>
+
+        <!-- 成功彈窗 -->
+        <div id="success-message" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-3xl p-10 text-center max-w-sm shadow-2xl scale-110">
+                <div class="text-7xl mb-4 animate-bounce">🏆</div>
+                <h3 class="text-3xl font-bold text-slate-800">任務圓滿達成！</h3>
+                <p class="mt-4 text-slate-600 leading-relaxed">你已經成功辨識了二崙軍史公園的所有三軍設施，獲得「特級偵查官」勳章！</p>
+                <button onclick="location.reload()" class="mt-8 bg-blue-600 text-white px-10 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">
+                    再挑戰一次
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const items = [
+            { id: 1, name: 'F-5E 戰鬥機', type: 'AIR_FORCE', img: 'F-5E 虎二式戰鬥機 (中正號).jpg' },
+            { id: 2, name: 'M48A3 戰車', type: 'ARMY', img: 'M48A3 巴頓戰車.jpg' },
+            { id: 3, name: 'M101 榴彈砲', type: 'ARMY', img: '榴彈砲.jpg' },
+            { id: 4, name: '雙管5吋艦砲', type: 'NAVY', img: '富陽驅逐艦雙管5吋砲.jpg' },
+            { id: 5, name: '鯨型小艇', type: 'NAVY', img: '平靖軍艦鯨型小艇.jpg' },
+            { id: 6, name: '開陽艦螺旋槳', type: 'NAVY', img: '開陽軍艦俥葉.jpg' },
+            { id: 7, name: '開陽艦海錨', type: 'NAVY', img: '開陽軍艦海錨.jpg' }
+        ];
+
+        let score = 0;
+        const pool = document.getElementById('item-pool');
+        const scoreDisplay = document.getElementById('score');
+
+        function initGame() {
+            const shuffled = [...items].sort(() => Math.random() - 0.5);
+            
+            shuffled.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'draggable bg-white border border-slate-200 p-2 rounded-2xl shadow-sm w-40 h-52 flex flex-col items-center shrink-0 hover:shadow-md transition-shadow';
+                card.draggable = true;
+                card.id = `item-${item.id}`;
+                
+                card.innerHTML = `
+                    <div class="img-container mb-2">
+                        <img src="${item.img}" alt="${item.name}" draggable="false" onerror="this.src='https://via.placeholder.com/150?text=載入中...'">
+                    </div>
+                    <span class="text-sm font-bold text-slate-700 text-center">${item.name}</span>
+                `;
+                
+                card.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', item.id);
+                    card.classList.add('dragging');
+                });
+
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('dragging');
+                });
+
+                card.addEventListener('touchstart', (e) => {
+                    card.classList.add('dragging');
+                }, {passive: true});
+
+                pool.appendChild(card);
+            });
+        }
+
+        const dropZones = document.querySelectorAll('.drop-zone');
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('drag-over');
+            });
+
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('drag-over');
+            });
+
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                
+                const itemId = e.dataTransfer.getData('text/plain');
+                const draggedEl = document.getElementById(`item-${itemId}`);
+                if (!draggedEl) return;
+
+                const itemData = items.find(i => i.id == itemId);
+
+                if (itemData.type === zone.id) {
+                    const content = zone.querySelector('.target-content');
+                    draggedEl.classList.remove('w-40', 'h-52');
+                    draggedEl.classList.add('w-28', 'h-36', 'opacity-90', 'scale-90');
+                    draggedEl.draggable = false;
+                    content.appendChild(draggedEl);
+                    
+                    score++;
+                    scoreDisplay.textContent = score;
+
+                    if (score === items.length) {
+                        setTimeout(() => {
+                            document.getElementById('success-message').classList.remove('hidden');
+                        }, 500);
+                    }
+                } else {
+                    zone.classList.add('bg-red-200');
+                    setTimeout(() => zone.classList.remove('bg-red-200'), 500);
+                }
+            });
+        });
+
+        initGame();
+    </script>
+</body>
+</html>
